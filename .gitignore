@@ -93,4 +93,7 @@ postgres_backup.tar.gz
 API KEYS.txt
 *API*KEYS*.txt
 api_keys.txt
-keys.txt
+keys.txtvenv/
+backendv/
+backend/venv/
+backend/backendv/
