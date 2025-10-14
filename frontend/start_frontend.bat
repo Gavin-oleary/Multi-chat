@@ -1,0 +1,9 @@
+@echo off 
+echo Starting frontend server... 
+if not exist node_modules ( 
+    echo Installing dependencies... 
+    npm install 
+) 
+echo Starting development server... 
+npm run dev 
+pause 

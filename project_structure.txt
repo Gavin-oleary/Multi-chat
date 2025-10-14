@@ -1,0 +1,122 @@
+multi-model-chat/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py                      # FastAPI app entry point
+│   │   ├── config.py                    # Configuration settings
+│   │   ├── database.py                  # Database connection setup
+│   │   │
+│   │   ├── api/
+│   │   │   ├── __init__.py
+│   │   │   ├── deps.py                  # Shared dependencies
+│   │   │   └── v1/
+│   │   │       ├── __init__.py
+│   │   │       ├── router.py            # Main API router
+│   │   │       ├── conversations.py     # Conversation endpoints
+│   │   │       ├── messages.py          # Message endpoints
+│   │   │       └── chat.py              # Multi-model chat endpoints
+│   │   │
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   ├── conversation.py          # Conversation DB model
+│   │   │   ├── message.py               # Message DB model
+│   │   │   └── user.py                  # User DB model (if needed)
+│   │   │
+│   │   ├── schemas/
+│   │   │   ├── __init__.py
+│   │   │   ├── conversation.py          # Conversation Pydantic schemas
+│   │   │   ├── message.py               # Message Pydantic schemas
+│   │   │   └── chat.py                  # Chat request/response schemas
+│   │   │
+│   │   ├── services/
+│   │   │   ├── __init__.py
+│   │   │   ├── conversation_service.py  # Business logic for conversations
+│   │   │   └── chat_service.py          # Multi-model orchestration
+│   │   │
+│   │   ├── clients/
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py                  # Base client interface
+│   │   │   ├── claude.py                # Anthropic Claude client
+│   │   │   ├── openai.py                # OpenAI ChatGPT client
+│   │   │   ├── gemini.py                # Google Gemini client
+│   │   │   ├── grok.py                  # X.AI Grok client
+│   │   │   └── perplexity.py            # Perplexity client
+│   │   │
+│   │   └── utils/
+│   │       ├── __init__.py
+│   │       └── helpers.py               # Utility functions
+│   │
+│   ├── alembic/                         # Database migrations
+│   │   ├── versions/
+│   │   └── env.py
+│   │
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── conftest.py
+│   │   ├── test_api/
+│   │   ├── test_services/
+│   │   └── test_clients/
+│   │
+│   ├── .env.example                     # Example environment variables
+│   ├── .env                             # Actual environment variables (gitignored)
+│   ├── requirements.txt                 # Python dependencies
+│   ├── alembic.ini                      # Alembic configuration
+│   └── README.md
+│
+├── frontend/
+│   ├── public/
+│   │   └── favicon.ico
+│   │
+│   ├── src/
+│   │   ├── main.jsx                     # React entry point
+│   │   ├── App.jsx                      # Root component
+│   │   │
+│   │   ├── components/
+│   │   │   ├── Chat/
+│   │   │   │   ├── ChatInput.jsx        # Prompt input component
+│   │   │   │   ├── ModelResponse.jsx    # Single model response card
+│   │   │   │   ├── ModelGrid.jsx        # Grid of all 5 model responses
+│   │   │   │   └── MessageBubble.jsx    # Individual message display
+│   │   │   │
+│   │   │   ├── Sidebar/
+│   │   │   │   ├── ConversationList.jsx # List of saved conversations
+│   │   │   │   └── ConversationItem.jsx # Single conversation item
+│   │   │   │
+│   │   │   └── common/
+│   │   │       ├── Button.jsx
+│   │   │       ├── Loading.jsx
+│   │   │       └── ErrorBoundary.jsx
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── ChatPage.jsx             # Main chat interface
+│   │   │   └── ConversationPage.jsx     # View saved conversation
+│   │   │
+│   │   ├── services/
+│   │   │   └── api.js                   # API client for backend
+│   │   │
+│   │   ├── store/
+│   │   │   ├── chatStore.js             # Chat state management
+│   │   │   └── conversationStore.js     # Conversation state
+│   │   │
+│   │   ├── hooks/
+│   │   │   ├── useChat.js               # Custom hook for chat logic
+│   │   │   └── useConversations.js      # Custom hook for conversations
+│   │   │
+│   │   ├── utils/
+│   │   │   └── helpers.js               # Utility functions
+│   │   │
+│   │   └── styles/
+│   │       └── index.css                # Global styles
+│   │
+│   ├── .env.example
+│   ├── .env                             # Frontend environment variables
+│   ├── .gitignore
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── README.md
+│
+├── .gitignore                           # Root gitignore
+├── docker-compose.yml                   # Docker setup (optional)
+├── README.md                            # Project documentation
+└── LICENSE

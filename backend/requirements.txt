@@ -1,0 +1,48 @@
+# FastAPI and Server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+psycopg2-binary==2.9.9  # PostgreSQL driver
+asyncpg==0.29.0  # Async PostgreSQL driver
+pgvector==0.2.4  #PSQL VDB
+
+# Pydantic
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# AI Provider SDKs
+anthropic==0.18.1
+openai==1.12.0
+google-generativeai==0.3.2
+httpx==0.26.0  # For custom API clients (Grok, Perplexity)
+
+# Utilities
+python-dotenv==1.0.0
+python-jose[cryptography]==3.3.0  # For JWT tokens if needed
+passlib[bcrypt]==1.7.4  # For password hashing if needed
+bleach==6.1.0  # For HTML sanitization
+
+# Document Processing
+PyPDF2==3.0.1  # For PDF text extraction
+python-docx==1.1.0  # For Word document processing
+chardet==5.2.0  # For better encoding detection
+
+# Cache
+redis==5.0.1  # For response caching
+
+# CORS
+
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0  # For testing async endpoints
+
+# Development
+black==24.1.1
+flake8==7.0.0
+mypy==1.8.0

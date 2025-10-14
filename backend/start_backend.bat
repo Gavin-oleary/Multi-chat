@@ -1,0 +1,9 @@
+@echo off 
+echo Starting backend server... 
+call backendv\Scripts\activate 
+pip install -q -r requirements.txt 
+echo Running database initialization... 
+python init_db.py 
+echo Starting FastAPI server... 
+python -m app.main 
+pause 
