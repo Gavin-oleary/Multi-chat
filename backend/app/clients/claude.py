@@ -15,13 +15,14 @@ class ClaudeClient(BaseAIClient):
         self.client = Anthropic(api_key=api_key)
         self.model = model
     
-    async def generate_response(self, prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
+    async def generate_response(self, prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None, system_prompt: Optional[str] = None) -> str:
         """
         Generate a response from Claude.
         
         Args:
             prompt: The user's input prompt
             conversation_history: Previous messages in the conversation
+            system_prompt: Optional system prompt with RAG context
         
         Returns:
             Claude's response as a string
@@ -39,11 +40,18 @@ class ClaudeClient(BaseAIClient):
         })
         
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                messages=messages
-            )
+            # Build API call parameters
+            params = {
+                "model": self.model,
+                "max_tokens": 4096,
+                "messages": messages
+            }
+            
+            # Add system prompt if provided (includes RAG context)
+            if system_prompt:
+                params["system"] = system_prompt
+            
+            response = self.client.messages.create(**params)
             
             # Extract text from response
             return response.content[0].text

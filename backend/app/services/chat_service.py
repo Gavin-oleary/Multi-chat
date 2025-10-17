@@ -16,7 +16,8 @@ from app.clients.base import BaseAIClient
 from app.api.deps import get_ai_clients
 from app.utils.circuit_breaker import circuit_manager
 from app.utils.validation import sanitize_string, validate_prompt_length
-from app.utils.cache import response_cache
+# Cache is disabled due to incorrect implementation
+# from app.utils.cache import response_cache
 from app.services import system_prompt_service
 
 
@@ -54,42 +55,39 @@ async def get_model_response(
     system_prompt: Optional[str] = None
 ) -> ModelResponse:
     """
-    Get response from a single AI model with circuit breaker protection and caching.
+    Get response from a single AI model with circuit breaker protection.
+    
+    NOTE: Caching is currently disabled. The original implementation had incorrect
+    method calls (response_cache.get/set don't exist). To re-enable caching, use:
+    - await response_cache.get_cached_response(...)
+    - await response_cache.set_cached_response(...)
     
     Args:
         client: AI client instance
         provider: Model provider enum
-        prompt: User prompt (potentially augmented with RAG context)
+        prompt: User prompt
         history: Conversation history
-        rag_context: Optional RAG context (for cache key differentiation)
+        rag_context: Optional RAG context
+        system_prompt: Optional system prompt
         
     Returns:
         ModelResponse object
     """
-    # Create cache key
-    cache_key = f"{provider.value}:{hash(prompt)}:{hash(str(history))}"
-    if rag_context:
-        cache_key += f":{hash(rag_context)}"
-    
-    # Check cache
-    cached = response_cache.get(cache_key)
-    if cached:
-        return ModelResponse(
-            provider=provider,
-            content=cached['content'],
-            latency_ms=0  # Cached response
-        )
-    
     try:
         start_time = time.time()
+        
+        # Debug: Log what we're sending to the model
+        print(f"\n🤖 Sending to {provider.value}:")
+        print(f"   System prompt length: {len(system_prompt) if system_prompt else 0} chars")
+        if system_prompt:
+            print(f"   System prompt preview: {system_prompt[:150]}...")
+        else:
+            print(f"   ⚠️  NO SYSTEM PROMPT!")
         
         # Get response from model
         response = await client.generate_response(prompt, history, system_prompt)
         
         latency_ms = (time.time() - start_time) * 1000
-        
-        # Cache successful response
-        response_cache.set(cache_key, {'content': response}, ttl=3600)
         
         # Record success in circuit breaker
         circuit_manager.record_success(provider.value)
@@ -139,6 +137,7 @@ async def format_conversation_history(
     
     for msg in messages:
         if msg.role == MessageRole.USER:
+            # If there are pending assistant responses, add the best one
             if current_assistant_responses:
                 best_response = max(current_assistant_responses, key=lambda r: len(r.content))
                 history.append({"role": "assistant", "content": best_response.content})
@@ -149,6 +148,7 @@ async def format_conversation_history(
         elif msg.role == MessageRole.ASSISTANT:
             current_assistant_responses.append(msg)
     
+    # Add any remaining assistant responses
     if current_assistant_responses:
         best_response = max(current_assistant_responses, key=lambda r: len(r.content))
         history.append({"role": "assistant", "content": best_response.content})
@@ -186,6 +186,7 @@ async def generate_multi_model_responses(
     if selected_models:
         models_to_use = selected_models
     else:
+        # Use all available providers
         all_providers = list(ModelProvider)
         healthy_providers = circuit_manager.get_healthy_providers(
             [p.value for p in all_providers]
@@ -195,6 +196,7 @@ async def generate_multi_model_responses(
             if p.value in healthy_providers
         ]
         
+        # If no healthy providers, use all anyway (circuit breaker will handle failures)
         if not models_to_use:
             models_to_use = all_providers
     
@@ -204,15 +206,23 @@ async def generate_multi_model_responses(
         # Get model-specific system prompt
         model_system_prompt = await system_prompt_service.get_system_prompt(provider, db)
         
+        print(f"\n📋 Processing {provider.value}:")
+        print(f"   Base system prompt: {len(model_system_prompt) if model_system_prompt else 0} chars")
+        print(f"   RAG context available: {bool(rag_context)} ({len(rag_context) if rag_context else 0} chars)")
+        
         # Format with RAG context if available
         if model_system_prompt and rag_context:
+            print(f"   ➜ Formatting system prompt WITH RAG context...")
             model_system_prompt = await system_prompt_service.format_system_prompt(
                 model_system_prompt, rag_context
             )
+            print(f"   ✓ Formatted prompt: {len(model_system_prompt)} chars")
         elif not model_system_prompt and rag_context:
+            print(f"   ➜ Using fallback generic prompt with RAG context...")
             # Fallback to generic prompt if no model-specific prompt exists
             model_system_prompt = create_system_prompt_with_context(rag_context)
         
+        print(f"Creating task for provider: {provider.value}")
         tasks.append(
             get_model_response(
                 all_clients[provider],
@@ -225,7 +235,9 @@ async def generate_multi_model_responses(
         )
     
     # Execute all tasks in parallel
+    print(f"Running {len(tasks)} tasks concurrently")
     responses = await asyncio.gather(*tasks)
+    print(f"All tasks completed. Results: {[type(r).__name__ for r in responses]}")
     
     return responses
 

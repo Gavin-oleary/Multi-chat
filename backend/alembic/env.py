@@ -22,7 +22,11 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set the SQLAlchemy URL from our settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Convert asyncpg URL to psycopg2 for synchronous migrations
+database_url = settings.DATABASE_URL
+if "+asyncpg" in database_url:
+    database_url = database_url.replace("+asyncpg", "")
+config.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

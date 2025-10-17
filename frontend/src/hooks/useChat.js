@@ -1,9 +1,8 @@
 /**
- * useChat hook with RAG support
+ * useChat hook with RAG support - FIXED VERSION
  * Location: frontend/src/hooks/useChat.js
  */
 
-import { useState } from 'react'
 import { chatApi } from '../services/api'
 import useChatStore from '../store/chatStore'
 
@@ -14,7 +13,8 @@ const useChat = () => {
     setResponses, 
     setIsSending,
     setConversationId,
-    setRagContext 
+    setRagContext,
+    addMessages  // Add this for batch adding messages
   } = useChatStore()
 
   const sendMessage = async (prompt, selectedModels = null, ragEnabled = false, contextCount = 3) => {
@@ -25,23 +25,43 @@ const useChat = () => {
       addMessage({
         role: 'user',
         content: prompt,
+        created_at: new Date().toISOString()
       })
 
       // Send to API with RAG options
       const response = await chatApi.send({
         prompt,
-        conversationId,
+        conversation_id: conversationId,  // This should be sent even if null
         models: selectedModels,
-        useRAG: ragEnabled,        // Pass RAG flag
-        topK: contextCount          // Pass context count
+        use_rag: ragEnabled,        // Fixed: snake_case for backend
+        top_k: contextCount          // Fixed: snake_case for backend
       })
 
-      // Update conversation ID if it's a new conversation
+      // CRITICAL FIX: Update conversation ID if it's a new conversation
+      // This ensures follow-up messages work correctly
       if (!conversationId && response.conversation_id) {
+        console.log('Setting new conversation ID:', response.conversation_id)
         setConversationId(response.conversation_id)
       }
 
-      // Set model responses
+      // Add assistant responses to messages
+      // The backend returns responses array with model responses
+      if (response.responses && response.responses.length > 0) {
+        const assistantMessages = response.responses
+          .filter(r => !r.error && r.content)  // Only add successful responses
+          .map(r => ({
+            role: 'assistant',
+            content: r.content,
+            model_provider: r.provider,
+            created_at: new Date().toISOString(),
+            latency_ms: r.latency_ms
+          }))
+        
+        // Add all assistant messages at once
+        addMessages(assistantMessages)
+      }
+
+      // Set current responses for display (includes errors)
       setResponses(response.responses)
       
       // Set RAG context if used
@@ -54,6 +74,12 @@ const useChat = () => {
       return response
     } catch (error) {
       console.error('Error sending message:', error)
+      
+      // Show error details
+      if (error.response) {
+        console.error('Response error:', error.response.data)
+      }
+      
       throw error
     } finally {
       setIsSending(false)

@@ -1,6 +1,6 @@
 import httpx
 from app.clients.base import BaseAIClient
-from typing import List, Dict
+from typing import List, Dict, Optional
 from app.constants import GROK_MODEL, GROK_API_URL
 
 
@@ -12,18 +12,26 @@ class GrokClient(BaseAIClient):
         self.model = model
         self.base_url = "https://api.x.ai/v1"
     
-    async def generate_response(self, prompt: str, conversation_history: List[Dict[str, str]] = None) -> str:
+    async def generate_response(self, prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None, system_prompt: Optional[str] = None) -> str:
         """
         Generate a response from Grok.
         
         Args:
             prompt: The user's input prompt
             conversation_history: Previous messages in the conversation
+            system_prompt: Optional system prompt with RAG context
         
         Returns:
             Grok's response as a string
         """
         messages = []
+        
+        # Add system prompt if provided (includes RAG context)
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
         
         # Add conversation history if provided
         if conversation_history:

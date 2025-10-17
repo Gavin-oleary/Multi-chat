@@ -129,11 +129,14 @@ async def create_system_prompt(
         Created system prompt
     """
     # Deactivate existing prompt for this provider
-    await db.execute(
-        select(SystemPrompt).where(
-            SystemPrompt.model_provider == prompt_data.model_provider
-        ).update({"is_active": False})
+    from sqlalchemy import update
+    
+    stmt = (
+        update(SystemPrompt)
+        .where(SystemPrompt.model_provider == prompt_data.model_provider)
+        .values(is_active=False)
     )
+    await db.execute(stmt)
     
     # Create new prompt
     prompt = SystemPrompt(**prompt_data.model_dump())

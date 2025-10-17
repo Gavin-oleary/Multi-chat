@@ -1,99 +1,69 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-from app.database import get_db
 import io
-import chardet
+import json
+
+from app.database import get_db
+from app.schemas.document import DocumentCreate, DocumentResponse, SimilaritySearchRequest, SimilaritySearchResult
+from app.services import document_service
+
+# Import text extraction libraries
 try:
-    import PyPDF2
+    from pypdf import PdfReader
+    PYPDF_AVAILABLE = True
 except ImportError:
-    PyPDF2 = None
+    try:
+        import PyPDF2
+        PdfReader = PyPDF2.PdfReader
+        PYPDF_AVAILABLE = True
+    except ImportError:
+        PYPDF_AVAILABLE = False
+
 try:
     from docx import Document as DocxDocument
+    DOCX_AVAILABLE = True
 except ImportError:
-    DocxDocument = None
-from app.schemas.document import (
-    DocumentCreate,
-    DocumentResponse,
-    DocumentWithChunks,
-    SimilaritySearchRequest,
-    SimilaritySearchResult
-)
-from app.services import document_service
+    DOCX_AVAILABLE = False
+
+import chardet
 
 router = APIRouter()
 
 
 def extract_text_from_pdf(content: bytes) -> str:
-    """Extract text from PDF file content."""
-    if PyPDF2 is None:
+    """Extract text from PDF file."""
+    if not PYPDF_AVAILABLE:
         raise HTTPException(
             status_code=500,
-            detail="PDF support is not installed. Please install PyPDF2."
+            detail="PDF support not installed. Run: pip install pypdf"
         )
     
-    try:
-        pdf_file = io.BytesIO(content)
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        
-        text_content = []
-        for page_num in range(len(pdf_reader.pages)):
-            page = pdf_reader.pages[page_num]
-            text = page.extract_text()
-            if text.strip():
-                text_content.append(text)
-        
-        if not text_content:
-            raise ValueError("No text content found in PDF")
-            
-        return "\n\n".join(text_content)
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to extract text from PDF: {str(e)}"
-        )
+    pdf_file = io.BytesIO(content)
+    reader = PdfReader(pdf_file)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
 
 
 def extract_text_from_docx(content: bytes) -> str:
-    """Extract text from Word document."""
-    if DocxDocument is None:
+    """Extract text from DOCX file."""
+    if not DOCX_AVAILABLE:
         raise HTTPException(
             status_code=500,
-            detail="Word document support is not installed. Please install python-docx."
+            detail="DOCX support not installed. Run: pip install python-docx"
         )
     
-    try:
-        docx_file = io.BytesIO(content)
-        doc = DocxDocument(docx_file)
-        
-        text_content = []
-        for paragraph in doc.paragraphs:
-            if paragraph.text.strip():
-                text_content.append(paragraph.text)
-        
-        # Also extract text from tables
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = []
-                for cell in row.cells:
-                    if cell.text.strip():
-                        row_text.append(cell.text)
-                if row_text:
-                    text_content.append(" | ".join(row_text))
-        
-        if not text_content:
-            raise ValueError("No text content found in document")
-            
-        return "\n\n".join(text_content)
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to extract text from Word document: {str(e)}"
-        )
+    docx_file = io.BytesIO(content)
+    doc = DocxDocument(docx_file)
+    text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+    return text
 
 
 def detect_encoding(content: bytes) -> str:
-    """Detect encoding of text content."""
+    """Detect the encoding of a text file."""
     result = chardet.detect(content)
     return result['encoding'] or 'utf-8'
 
@@ -117,61 +87,117 @@ async def upload_document(
     db: AsyncSession = Depends(get_db)
 ):
     """Upload a document and create embeddings from its text content."""
-    content = await file.read()
-    filename = file.filename.lower()
-    text_content = None
-    
-    # Check file type and extract text accordingly
-    if filename.endswith('.pdf'):
-        text_content = extract_text_from_pdf(content)
-    elif filename.endswith(('.doc', '.docx')):
-        text_content = extract_text_from_docx(content)
-    else:
-        # Try to decode as text with various encodings
-        encodings = ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']
+    try:
+        content = await file.read()
+        filename = file.filename.lower()
+        text_content = None
         
-        # Use chardet for better encoding detection
-        detected_encoding = detect_encoding(content)
-        if detected_encoding and detected_encoding not in encodings:
-            encodings.insert(0, detected_encoding)
+        # Provide progress feedback for different file types
+        file_size_mb = len(content) / (1024 * 1024)
         
-        for encoding in encodings:
-            try:
-                text_content = content.decode(encoding)
-                break
-            except (UnicodeDecodeError, LookupError):
-                continue
+        # Check file type and extract text accordingly
+        if filename.endswith('.pdf'):
+            if file_size_mb > 5:
+                # For large PDFs, warn user it might take time
+                print(f"Processing large PDF ({file_size_mb:.2f} MB): {file.filename}")
+            text_content = extract_text_from_pdf(content)
+            
+        elif filename.endswith(('.doc', '.docx')):
+            text_content = extract_text_from_docx(content)
+            
+        else:
+            # Try to decode as text with various encodings
+            encodings = ['utf-8', 'latin-1', 'windows-1252', 'iso-8859-1']
+            
+            # Use chardet for better encoding detection
+            detected_encoding = detect_encoding(content)
+            if detected_encoding and detected_encoding not in encodings:
+                encodings.insert(0, detected_encoding)
+            
+            for encoding in encodings:
+                try:
+                    text_content = content.decode(encoding)
+                    break
+                except (UnicodeDecodeError, LookupError):
+                    continue
+            
+            if text_content is None:
+                raise HTTPException(
+                    status_code=415,
+                    detail=f"Unable to read file '{file.filename}'. Supported formats: TXT, MD, CSV, JSON, PDF, DOC, DOCX"
+                )
         
-        if text_content is None:
+        # Check if we got any content
+        if not text_content or not text_content.strip():
             raise HTTPException(
-                status_code=415,
-                detail=f"Unable to read file '{file.filename}'. Supported formats: TXT, MD, CSV, JSON, PDF, DOC, DOCX"
+                status_code=400,
+                detail="The uploaded file appears to be empty or contains no extractable text."
             )
-    
-    # Check if we got any content
-    if not text_content or not text_content.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="The uploaded file appears to be empty or contains no extractable text."
+        
+        # Provide feedback about processing embeddings
+        print(f"Creating embeddings for document with {len(text_content)} characters...")
+        
+        # Create document with embeddings
+        document = await document_service.create_document_with_embeddings(
+            content=text_content,
+            metadata={
+                "filename": file.filename,
+                "content_type": file.content_type,
+                "file_size": len(content),
+                "char_count": len(text_content)
+            },
+            db=db
         )
-    
-    # Create document with embeddings
-    document = await document_service.create_document_with_embeddings(
-        content=text_content,
-        metadata={
-            "filename": file.filename,
-            "content_type": file.content_type,
-            "file_size": len(content),
-            "char_count": len(text_content)
-        },
-        db=db
-    )
-    
-    return {
-        "id": document.id,
-        "message": f"Document '{file.filename}' uploaded successfully",
-        "char_count": len(text_content)
-    }
+        
+        return {
+            "id": document.id,
+            "message": f"Document '{file.filename}' uploaded successfully",
+            "char_count": len(text_content),
+            "status": "complete"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error processing upload: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing file: {str(e)}"
+        )
+
+
+@router.get("/", response_model=List[DocumentResponse])
+async def list_documents(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db)
+):
+    """List all documents."""
+    return await document_service.list_documents(db, skip, limit)
+
+
+@router.get("/{document_id}", response_model=DocumentResponse)
+async def get_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get a specific document."""
+    document = await document_service.get_document(document_id, db)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a document."""
+    success = await document_service.delete_document(document_id, db)
+    if not success:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"message": "Document deleted successfully"}
 
 
 @router.post("/search", response_model=List[SimilaritySearchResult])
@@ -185,15 +211,4 @@ async def search_documents(
         db=db,
         top_k=search_request.top_k
     )
-    
     return results
-
-
-@router.get("/{document_id}", response_model=DocumentWithChunks)
-async def get_document(
-    document_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """Get a document with all its chunks."""
-    # Implementation here
-    pass

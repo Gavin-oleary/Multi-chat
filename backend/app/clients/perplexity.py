@@ -1,6 +1,6 @@
 import httpx
 from app.clients.base import BaseAIClient
-from typing import List, Dict
+from typing import List, Dict, Optional
 from app.constants import PERPLEXITY_MODEL, PERPLEXITY_API_URL
 
 
@@ -12,24 +12,32 @@ class PerplexityClient(BaseAIClient):
         self.model = model
         self.base_url = "https://api.perplexity.ai"
     
-    async def generate_response(self, prompt: str, conversation_history: List[Dict[str, str]] = None) -> str:
+    async def generate_response(self, prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None, system_prompt: Optional[str] = None) -> str:
         """
         Generate a response from Perplexity.
         
         Args:
             prompt: The user's input prompt
             conversation_history: Previous messages in the conversation
+            system_prompt: Optional system prompt with RAG context
         
         Returns:
             Perplexity's response as a string
         """
         messages = []
         
+        # Add system prompt (includes RAG context if provided)
         # Perplexity requires a system message
-        messages.append({
-            "role": "system",
-            "content": "Be precise and concise."
-        })
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+        else:
+            messages.append({
+                "role": "system",
+                "content": "Be precise and concise."
+            })
         
         # Add conversation history if provided, filtering out any system messages
         # and excluding the last message if it's from the user (to avoid duplicates)

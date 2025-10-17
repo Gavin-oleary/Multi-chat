@@ -4,6 +4,7 @@ Run this to create all database tables.
 """
 
 import asyncio
+import sqlalchemy
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import create_async_engine
 from app.database import init_db, engine, Base, get_db
@@ -25,18 +26,46 @@ async def check_tables():
 async def main():
     print("🔧 Initializing database...")
     
+    # Enable pgvector extension
+    print("📦 Enabling pgvector extension...")
+    async with engine.begin() as conn:
+        await conn.execute(sqlalchemy.text("CREATE EXTENSION IF NOT EXISTS vector"))
+    print("✓ pgvector extension enabled")
+    
     # Check existing tables
     existing_tables = await check_tables()
     print(f"📋 Existing tables: {existing_tables}")
     
-    # Drop existing tables if they exist (to update schema)
-    if existing_tables:
-        print("🗑️  Dropping existing tables to update schema...")
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-        print("✓ Tables dropped")
+    # Only create tables if they don't exist (safe mode)
+    required_tables = ['conversations', 'messages', 'system_prompts', 'documents', 'document_chunks', 'embeddings']
+    missing_tables = [t for t in required_tables if t not in existing_tables]
     
-    # Create tables
+    if missing_tables:
+        print(f"⚠️  Missing tables: {missing_tables}")
+        print("Creating missing tables...")
+    elif existing_tables:
+        print("✓ All tables already exist - skipping initialization")
+        print("💡 Database is ready to use!")
+        
+        # Just verify system prompts exist
+        async for db in get_db():
+            try:
+                from sqlalchemy import select
+                from app.models.system_prompt import SystemPrompt
+                result = await db.execute(select(SystemPrompt))
+                prompts = result.scalars().all()
+                if not prompts:
+                    print("⚠️  No system prompts found, initializing defaults...")
+                    await system_prompt_service.initialize_default_prompts(db)
+                    print("✓ System prompts initialized")
+                else:
+                    print(f"✓ Found {len(prompts)} system prompts")
+            finally:
+                break
+        
+        return 0  # Exit successfully without recreating tables
+    
+    # Create tables (only if missing)
     try:
         await init_db()
         print("✅ Database tables created successfully!")

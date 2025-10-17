@@ -1,9 +1,7 @@
 @echo off 
 echo Starting backend server... 
-call backendv\Scripts\activate 
+call venv\Scripts\activate 
 pip install -q -r requirements.txt 
-echo Running database initialization... 
-python init_db.py 
 echo Starting FastAPI server... 
-python -m app.main 
+python -m uvicorn app.main:app --reload
 pause 
