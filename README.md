@@ -19,11 +19,11 @@ A powerful chat application that queries multiple AI models simultaneously and c
 - **Docker Desktop** ([Download](https://www.docker.com/products/docker-desktop))
 - **API Keys** from AI providers (all offer free tiers!)
 
-### Installation
+### Easy Installation (Automated)
 
 1. **Clone or download this repository**
 
-2. **Run the setup wizard**
+2. **Run the setup script**
 
    **Windows:**
    ```powershell
@@ -36,19 +36,41 @@ A powerful chat application that queries multiple AI models simultaneously and c
    ./easy-setup.sh
    ```
 
-3. **Enter your API keys when prompted**
+3. **Follow the prompts** to add your API keys
 
-   The wizard will guide you through getting FREE API keys from:
-   - OpenAI (ChatGPT)
-   - Anthropic (Claude)
-   - Google (Gemini)
-   - X.AI (Grok)
-   - Perplexity
+   The script will guide you through:
+   - ✅ Checking Docker installation
+   - ✅ Creating the `.env` configuration file
+   - ✅ Adding API keys for the providers you want
+   - ✅ Starting all containers
+   - ✅ Verifying everything is running
 
-4. **Done!** The application will automatically start and open in your browser 🎉
+4. **Done!** The application will automatically start 🎉
 
    - Frontend: http://localhost:5173
+   - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/api/v1/docs
+
+### Manual Installation (Alternative)
+
+If you prefer to set up manually:
+
+1. **Create your environment file**
+   ```bash
+   cp env.example .env
+   ```
+
+2. **Edit `.env` and add your API keys**
+   ```env
+   OPENAI_API_KEY=your_actual_key_here
+   ANTHROPIC_API_KEY=your_actual_key_here
+   # ... etc
+   ```
+
+3. **Start the application**
+   ```bash
+   docker compose up -d
+   ```
 
 ## Usage
 
@@ -57,19 +79,30 @@ A powerful chat application that queries multiple AI models simultaneously and c
 After the initial setup, you can start the application with:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Stopping the Application
 
 ```bash
-docker-compose down
+docker compose down
+```
+
+### Restarting the Application
+
+```bash
+docker compose restart
 ```
 
 ### Viewing Logs
 
 ```bash
-docker-compose logs -f
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f backend
+docker compose logs -f frontend
 ```
 
 ## Getting API Keys
@@ -183,7 +216,7 @@ Upload documents and chat with them using Retrieval-Augmented Generation:
 
 **"Failed to pull image"**
 - Check your internet connection
-- Try: `docker-compose pull`
+- Try: `docker compose pull`
 
 ### API Issues
 
@@ -200,14 +233,15 @@ Upload documents and chat with them using Retrieval-Augmented Generation:
 ### General Issues
 
 **"Can't connect to backend"**
-- Ensure backend is running: `docker-compose ps`
-- Check logs: `docker-compose logs backend`
-- Verify port 8000 is accessible: `curl http://localhost:8000/health`
+- Ensure backend is running: `docker compose ps`
+- Check logs: `docker compose logs backend`
+- Verify backend is accessible: `curl http://localhost:8000`
 
 **"Frontend not loading"**
 - Clear browser cache
-- Check logs: `docker-compose logs frontend`
-- Try accessing directly: `http://localhost:5173`
+- Check logs: `docker compose logs frontend`
+- Try accessing directly: http://localhost:5173
+- Verify frontend container is running: `docker compose ps`
 
 ## Development
 
@@ -242,7 +276,7 @@ For production deployment instructions, see [deployment.md](deployment.md).
 
 Quick production start:
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## Contributing

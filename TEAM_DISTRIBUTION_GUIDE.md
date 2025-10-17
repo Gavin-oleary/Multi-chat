@@ -20,28 +20,48 @@
 
 ## Quick Setup Instructions
 
-### Step 1: Get the Code
-Extract the provided ZIP file or clone the repository:
-```powershell
-git clone <repository-url>
-cd Mulit-chat
-```
+### Option 1: Easy Setup (Recommended)
 
-### Step 2: Configure Environment
-1. Copy `env.example` to `.env`:
+1. **Get the Code**
    ```powershell
-   Copy-Item env.example .env
+   git clone <repository-url>
+   cd Mulit-chat
    ```
 
-2. Edit `.env` file and add your API keys:
-   - Open `.env` in any text editor (Notepad, VS Code, etc.)
-   - Replace placeholder values with actual API keys
-   - At minimum, add your `OPENAI_API_KEY` to get started
+2. **Run the Setup Script**
+   ```powershell
+   .\easy-setup.ps1
+   ```
 
-### Step 3: Start the Application
-```powershell
-docker-compose up -d
-```
+3. **Follow the Prompts**
+   - The script will check Docker
+   - Create your `.env` file
+   - Ask for your API keys
+   - Start all containers
+   - Verify everything is running
+
+That's it! The script handles everything automatically. ✨
+
+### Option 2: Manual Setup
+
+1. **Get the Code**
+   ```powershell
+   git clone <repository-url>
+   cd Mulit-chat
+   ```
+
+2. **Configure Environment**
+   ```powershell
+   Copy-Item env.example .env
+   notepad .env
+   ```
+   - Replace placeholder values with actual API keys
+   - At minimum, add your `OPENAI_API_KEY`
+
+3. **Start the Application**
+   ```powershell
+   docker compose up -d
+   ```
 
 This will:
 - Download required Docker images (first time only)
